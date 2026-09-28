@@ -17,7 +17,7 @@ from utils.sequence_embeddings import event_sequences
 from utils.time_validation import walk_forward_splits
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
 VARIANTS = {
     "full_mean": MEAN_COLUMNS,
     "full_position": MEAN_COLUMNS + POSITION_COLUMNS,

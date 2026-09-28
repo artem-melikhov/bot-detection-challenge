@@ -2,12 +2,5 @@
 __pycache__/
 .ipynb_checkpoints/
 .venv/
-output/stacked_submission.csv
-output/stacking_holdout_scores.csv
-output/peer_feature_validation_scores.csv
-output/peer_best_candidate.csv
-output/sequence_validation_scores.csv
-output/sequence_candidate.csv
-output/full_sequence_validation_scores.csv
-output/full_sequence_candidate.csv
-output/submission.csv
+.pytest_cache/
+output/*.csv

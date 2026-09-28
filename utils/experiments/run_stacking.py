@@ -15,14 +15,14 @@ import optuna
 import pandas as pd
 from catboost import CatBoostClassifier
 
-from run_solution import RANDOM_STATE, load_model_data
+from run_solution import RANDOM_STATE, load_model_data, make_model
 from utils.blending import mean_percentile_rank
 from utils.metric import precision_at_recall
 from utils.stacking import MODEL_NAMES, meta_features, time_blocks
 
 
-ROOT = Path(__file__).resolve().parent
-PARAMS_PATH = ROOT / "stacking_params.json"
+ROOT = Path(__file__).resolve().parents[2]
+PARAMS_PATH = Path(__file__).resolve().with_name("stacking_params.json")
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 
@@ -113,6 +113,17 @@ def combined_meta(blocks):
                      ignore_index=True)
 
 
+def original_rank_on_holdout(fit, y, block, columns_by_model):
+    """Восстанавливает прежний ансамбль, если его OOF-таблицы нет локально."""
+    _, fit_mask, valid_mask = block
+    scores = [
+        score_block(make_model(), fit, fit, y, fit_mask, valid_mask,
+                    columns_by_model[name])
+        for name in MODEL_NAMES
+    ]
+    return mean_percentile_rank(scores)
+
+
 def tune_meta(oof, trials: int) -> dict:
     """На каждом шаге верхняя модель видит лишь более ранние OOF блоки."""
     def objective(trial):
@@ -177,10 +188,13 @@ def main(tune: bool, base_trials: int, meta_trials: int) -> None:
             old_holdout.target.to_numpy(), holdout.target.to_numpy()
         ):
             raise ValueError("Сохранённая старая проверка не совпадает с отложенными куками")
-        summary_rows.insert(0, {
-            "model": "Старое среднее рангов",
-            "p_at_r70": precision_at_recall(old_holdout.target, old_holdout.rank_mean),
-        })
+        old_rank = old_holdout.rank_mean.to_numpy()
+    else:
+        old_rank = original_rank_on_holdout(fit, y, blocks[-1], columns_by_model)
+    summary_rows.insert(0, {
+        "model": "Старое среднее рангов",
+        "p_at_r70": precision_at_recall(holdout.target, old_rank),
+    })
     summary = pd.DataFrame(summary_rows)
     print("17–19 апреля, отложенные дни:\n" + summary.to_string(index=False), flush=True)
 

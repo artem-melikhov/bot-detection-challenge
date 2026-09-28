@@ -15,7 +15,7 @@ from utils.peer_features import (
 from utils.time_validation import walk_forward_splits
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
