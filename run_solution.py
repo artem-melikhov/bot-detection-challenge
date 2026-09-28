@@ -18,7 +18,7 @@ RANDOM_STATE = 42
 DATE_COLUMNS = ["cookie_created_at", "window_start_ts", "window_end_ts"]
 
 
-def make_model() -> CatBoostClassifier:
+def make_model(extra_cat_features: tuple[str, ...] = ()) -> CatBoostClassifier:
     return CatBoostClassifier(
         iterations=600,
         depth=6,
@@ -29,7 +29,7 @@ def make_model() -> CatBoostClassifier:
         random_seed=RANDOM_STATE,
         thread_count=4,
         allow_writing_files=False,
-        cat_features=["top_location"],
+        cat_features=["top_location", *extra_cat_features],
     )
 
 

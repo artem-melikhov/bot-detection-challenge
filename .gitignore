@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 output/stacked_submission.csv
 output/stacking_holdout_scores.csv
+output/peer_feature_validation_scores.csv
+output/peer_best_candidate.csv
