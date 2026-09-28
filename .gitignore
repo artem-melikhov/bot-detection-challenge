@@ -10,3 +10,4 @@ output/sequence_validation_scores.csv
 output/sequence_candidate.csv
 output/full_sequence_validation_scores.csv
 output/full_sequence_candidate.csv
+output/submission.csv

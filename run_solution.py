@@ -1,4 +1,4 @@
-"""Проверяет ансамбль на будущих днях и создаёт submission.csv."""
+"""Обучает итоговый ансамбль и создаёт submission.csv."""
 
 from pathlib import Path
 
@@ -8,10 +8,10 @@ from catboost import CatBoostClassifier
 
 from utils.blending import mean_percentile_rank
 from utils.features import build_features
+from utils.full_sequence import MEAN_COLUMNS, full_embedding_features, train_full_word2vec
 from utils.journeys import build_journey_features
 from utils.pointer_location import build_pointer_location_features
-from utils.metric import precision_at_recall
-from utils.time_validation import walk_forward_splits
+from utils.sequence_embeddings import event_sequences
 
 
 RANDOM_STATE = 42
@@ -71,33 +71,22 @@ def load_model_data(root: Path):
 def main() -> None:
     root = Path(__file__).resolve().parent
     train, test, fit, predict, columns_by_model, y = load_model_data(root)
-    validation_parts = []
-    for fold_name, fit_mask, valid_mask in walk_forward_splits(train):
-        fold_scores = {}
-        for name, columns in columns_by_model.items():
-            model = make_model()
-            model.fit(fit.loc[fit_mask, columns], y[fit_mask])
-            fold_scores[name] = model.predict_proba(fit.loc[valid_mask, columns])[:, 1]
-        fold_scores["rank_mean"] = mean_percentile_rank(list(fold_scores.values()))
-        fold_result = pd.DataFrame({
-            "cookie_id": train.loc[valid_mask, "cookie_id"].to_numpy(),
-            "fold": fold_name,
-            "target": y[valid_mask],
-            **fold_scores,
-        })
-        validation_parts.append(fold_result)
-        print(f"{fold_name}: P@R70 = {precision_at_recall(y[valid_mask], fold_scores['rank_mean']):.3f}")
+    events = pd.read_csv(root / "data/events.csv.gz", parse_dates=["event_ts"])
+    meta, sequences = event_sequences(train, test, events)
+    assert meta.cookie_id.equals(pd.concat([train.cookie_id, test.cookie_id], ignore_index=True))
 
-    output = root / "output"
-    output.mkdir(exist_ok=True)
-    validation = pd.concat(validation_parts, ignore_index=True)
-    validation.to_csv(output / "final_validation_scores.csv", index=False, float_format="%.17g")
+    # Word2Vec учится на полных историях только из train. События уже обрезаны
+    # по суточным окнам; метки test и его события в обучение векторов не попадают.
+    w2v = train_full_word2vec(sequences[:len(train)])
+    vectors = full_embedding_features(sequences, w2v)[MEAN_COLUMNS]
+    fit = pd.concat([fit, vectors.iloc[:len(train)]], axis=1)
+    predict = pd.concat([predict, vectors.iloc[len(train):].reset_index(drop=True)], axis=1)
 
     scores = []
     for columns in columns_by_model.values():
         model = make_model()
-        model.fit(fit[columns], y)
-        scores.append(model.predict_proba(predict[columns])[:, 1])
+        model.fit(fit[columns + MEAN_COLUMNS], y)
+        scores.append(model.predict_proba(predict[columns + MEAN_COLUMNS])[:, 1])
 
     answer = pd.DataFrame({
         "cookie_id": test.cookie_id,
@@ -108,6 +97,8 @@ def main() -> None:
     assert set(answer.cookie_id) == set(sample.cookie_id)
     assert np.isfinite(answer.score).all() and answer.score.between(0, 1).all()
 
+    output = root / "output"
+    output.mkdir(exist_ok=True)
     path = output / "submission.csv"
     answer.to_csv(path, index=False, float_format="%.17g")
     print(f"Готово: {path} ({len(answer)} кук)")
