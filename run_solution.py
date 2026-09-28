@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from catboost import CatBoostClassifier
 
+from utils.blending import mean_percentile_rank
 from utils.features import build_features
 from utils.journeys import build_journey_features
 
@@ -56,7 +57,10 @@ def main() -> None:
         model.fit(fit[columns], train.target.to_numpy())
         scores.append(model.predict_proba(predict[columns])[:, 1])
 
-    answer = pd.DataFrame({"cookie_id": test.cookie_id, "score": np.mean(scores, axis=0)})
+    answer = pd.DataFrame({
+        "cookie_id": test.cookie_id,
+        "score": mean_percentile_rank(scores),
+    })
     sample = pd.read_csv(data / "sample_submission.csv")
     assert answer.cookie_id.is_unique
     assert set(answer.cookie_id) == set(sample.cookie_id)
