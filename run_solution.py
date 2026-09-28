@@ -1,4 +1,4 @@
-"""Обучает финальные модели из исходных данных и создаёт submission.csv."""
+"""Проверяет ансамбль на будущих днях и создаёт submission.csv."""
 
 from pathlib import Path
 
@@ -9,6 +9,9 @@ from catboost import CatBoostClassifier
 from utils.blending import mean_percentile_rank
 from utils.features import build_features
 from utils.journeys import build_journey_features
+from utils.pointer_location import build_pointer_location_features
+from utils.metric import precision_at_recall
+from utils.time_validation import walk_forward_splits
 
 
 RANDOM_STATE = 42
@@ -26,6 +29,7 @@ def make_model() -> CatBoostClassifier:
         random_seed=RANDOM_STATE,
         thread_count=4,
         allow_writing_files=False,
+        cat_features=["top_location"],
     )
 
 
@@ -38,8 +42,11 @@ def main() -> None:
 
     features, groups, _ = build_features(train, test, events)
     journeys, journey_groups = build_journey_features(train, test, events)
+    pointer = build_pointer_location_features(train, test, events)
     features = features.merge(
         journeys.drop(columns="split"), on="cookie_id", how="left", validate="one_to_one"
+    ).merge(
+        pointer, on="cookie_id", how="left", validate="one_to_one"
     )
     fit = features.iloc[:len(train)].reset_index(drop=True)
     predict = features.iloc[len(train):].reset_index(drop=True)
@@ -51,10 +58,39 @@ def main() -> None:
     routes = base + groups["routes"]
     context = routes + [column for column in journey_groups["context"]
                         if column != "seller_switch_share"]
+    mouse_and_location = ["pointer_x_std", "pointer_y_std", "counter_zeros", "top_location"]
+    columns_by_model = {
+        "base_plus": base + mouse_and_location,
+        "routes_plus": routes + mouse_and_location,
+        "context_plus": context + mouse_and_location,
+    }
+    y = train.target.to_numpy()
+    validation_parts = []
+    for fold_name, fit_mask, valid_mask in walk_forward_splits(train):
+        fold_scores = {}
+        for name, columns in columns_by_model.items():
+            model = make_model()
+            model.fit(fit.loc[fit_mask, columns], y[fit_mask])
+            fold_scores[name] = model.predict_proba(fit.loc[valid_mask, columns])[:, 1]
+        fold_scores["rank_mean"] = mean_percentile_rank(list(fold_scores.values()))
+        fold_result = pd.DataFrame({
+            "cookie_id": train.loc[valid_mask, "cookie_id"].to_numpy(),
+            "fold": fold_name,
+            "target": y[valid_mask],
+            **fold_scores,
+        })
+        validation_parts.append(fold_result)
+        print(f"{fold_name}: P@R70 = {precision_at_recall(y[valid_mask], fold_scores['rank_mean']):.3f}")
+
+    output = root / "output"
+    output.mkdir(exist_ok=True)
+    validation = pd.concat(validation_parts, ignore_index=True)
+    validation.to_csv(output / "final_validation_scores.csv", index=False, float_format="%.17g")
+
     scores = []
-    for columns in [base, routes, context]:
+    for columns in columns_by_model.values():
         model = make_model()
-        model.fit(fit[columns], train.target.to_numpy())
+        model.fit(fit[columns], y)
         scores.append(model.predict_proba(predict[columns])[:, 1])
 
     answer = pd.DataFrame({
@@ -66,9 +102,8 @@ def main() -> None:
     assert set(answer.cookie_id) == set(sample.cookie_id)
     assert np.isfinite(answer.score).all() and answer.score.between(0, 1).all()
 
-    path = root / "output" / "submission.csv"
-    path.parent.mkdir(exist_ok=True)
-    answer.to_csv(path, index=False, float_format="%.10f")
+    path = output / "submission.csv"
+    answer.to_csv(path, index=False, float_format="%.17g")
     print(f"Готово: {path} ({len(answer)} кук)")
 
 
