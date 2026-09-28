@@ -28,6 +28,7 @@ python3 run_solution.py
 - `notebooks/05_item_journeys.ipynb`: история объявлений, контекст и проверка отбора признаков.
 - `notebooks/06_conclusion.ipynb`: сравнение ошибок, смешивание моделей и итоговый ответ.
 - `notebooks/07_pointer_location.ipynb`: проверка координат курсора и города объявления. Новый кандидат получил 0,725 на временной валидации против 0,566 у текущего ответа. `output/submission.csv` пока не обновляли.
+- `notebooks/08_single_full_model.ipynb`: проверка одной CatBoost с новыми признаками. Отобранный набор дал 0,716, все 108 признаков дали 0,696. Ответы этих моделей лежат отдельно в `output/single_context_submission.csv` и `output/single_full_submission.csv`; текущий `output/submission.csv` не меняли.
 - `notebooks/quickstart.ipynb`: пример из исходного набора данных.
 - `utils/`: расчёт признаков и официальная метрика; `tests/`: проверки границ суточного окна.
 - `data/`: исходные файлы; `output/`: предсказания и таблицы для сравнения.
