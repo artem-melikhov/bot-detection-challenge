@@ -7,3 +7,4 @@ nbformat==5.10.4
 nbclient==0.10.4
 catboost==1.2.10
 optuna==4.9.0
+gensim==4.4.0
