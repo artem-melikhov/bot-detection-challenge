@@ -23,21 +23,15 @@ def _entropy(frame: pd.DataFrame, column: str, name: str) -> pd.Series:
     return (entropy / np.log(varieties.where(varieties.gt(1)))).fillna(0).rename(name)
 
 
-def build_features(
+def events_in_windows(
     train: pd.DataFrame, test: pd.DataFrame, events: pd.DataFrame
-) -> tuple[pd.DataFrame, dict[str, list[str]], int]:
-    """Собирает старые и новые признаки без событий за концом окна.
-
-    Возвращает одну таблицу в порядке train, затем test, группы колонок и число
-    событий внутри окон. Метки target в функцию не попадают.
-    """
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Привязывает события к кукам и оставляет только разрешённые сутки."""
     meta = pd.concat(
         [train.assign(split="train"), test.assign(split="test")], ignore_index=True
     )
     if not meta.cookie_id.is_unique:
         raise ValueError("cookie_id должен быть уникальным в train и test")
-
-    original_event_cols = events.columns.tolist()
     joined = events.merge(
         meta[["cookie_id", "window_start_ts", "window_end_ts"]],
         on="cookie_id", how="left", validate="many_to_one",
@@ -49,6 +43,19 @@ def build_features(
         & joined.event_ts.lt(joined.window_end_ts)
     ].copy()
     inside = inside.sort_values(["cookie_id", "event_ts"], kind="mergesort")
+    return inside, meta
+
+
+def build_features(
+    train: pd.DataFrame, test: pd.DataFrame, events: pd.DataFrame
+) -> tuple[pd.DataFrame, dict[str, list[str]], int]:
+    """Собирает старые и новые признаки без событий за концом окна.
+
+    Возвращает одну таблицу в порядке train, затем test, группы колонок и число
+    событий внутри окон. Метки target в функцию не попадают.
+    """
+    original_event_cols = events.columns.tolist()
+    inside, meta = events_in_windows(train, test, events)
     by_cookie = inside.groupby("cookie_id", sort=False)
     inside["gap_sec"] = by_cookie.event_ts.diff().dt.total_seconds()
     inside["minute"] = inside.event_ts.dt.floor("min")
