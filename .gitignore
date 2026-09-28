@@ -2,3 +2,5 @@
 __pycache__/
 .ipynb_checkpoints/
 .venv/
+output/stacked_submission.csv
+output/stacking_holdout_scores.csv

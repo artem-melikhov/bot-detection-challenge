@@ -33,8 +33,8 @@ def make_model() -> CatBoostClassifier:
     )
 
 
-def main() -> None:
-    root = Path(__file__).resolve().parent
+def load_model_data(root: Path):
+    """Один раз собирает признаки для трёх вариантов CatBoost."""
     data = root / "data"
     train = pd.read_csv(data / "train.csv", parse_dates=DATE_COLUMNS)
     test = pd.read_csv(data / "test.csv", parse_dates=DATE_COLUMNS)
@@ -65,6 +65,12 @@ def main() -> None:
         "context_plus": context + mouse_and_location,
     }
     y = train.target.to_numpy()
+    return train, test, fit, predict, columns_by_model, y
+
+
+def main() -> None:
+    root = Path(__file__).resolve().parent
+    train, test, fit, predict, columns_by_model, y = load_model_data(root)
     validation_parts = []
     for fold_name, fit_mask, valid_mask in walk_forward_splits(train):
         fold_scores = {}
@@ -97,7 +103,7 @@ def main() -> None:
         "cookie_id": test.cookie_id,
         "score": mean_percentile_rank(scores),
     })
-    sample = pd.read_csv(data / "sample_submission.csv")
+    sample = pd.read_csv(root / "data" / "sample_submission.csv")
     assert answer.cookie_id.is_unique
     assert set(answer.cookie_id) == set(sample.cookie_id)
     assert np.isfinite(answer.score).all() and answer.score.between(0, 1).all()

@@ -1,0 +1,31 @@
+{
+  "random_state": 42,
+  "base": {
+    "base_plus": {
+      "iterations": 500,
+      "depth": 6,
+      "learning_rate": 0.04741068029115695,
+      "l2_leaf_reg": 3.7925666454258864
+    },
+    "routes_plus": {
+      "iterations": 500,
+      "depth": 6,
+      "learning_rate": 0.06276715779131764,
+      "l2_leaf_reg": 8.124745468376167
+    },
+    "context_plus": {
+      "iterations": 800,
+      "depth": 4,
+      "learning_rate": 0.0327292286750088,
+      "l2_leaf_reg": 2.9925566149075484
+    }
+  },
+  "meta": {
+    "iterations": 350,
+    "depth": 2,
+    "learning_rate": 0.0329096295291741,
+    "l2_leaf_reg": 6.01132183288578
+  },
+  "base_trials": 16,
+  "meta_trials": 24
+}
