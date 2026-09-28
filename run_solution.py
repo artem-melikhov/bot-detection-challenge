@@ -8,8 +8,10 @@ from catboost import CatBoostClassifier
 
 from utils.blending import mean_percentile_rank
 from utils.features import build_features
+from utils.full_sequence import MEAN_COLUMNS, full_embedding_features, train_full_word2vec
 from utils.journeys import build_journey_features
 from utils.pointer_location import build_pointer_location_features
+from utils.sequence_embeddings import event_sequences
 
 
 RANDOM_STATE = 42
@@ -67,9 +69,6 @@ def load_model_data(root: Path):
 
 
 def main() -> None:
-    from utils.full_sequence import MEAN_COLUMNS, full_embedding_features, train_full_word2vec
-    from utils.sequence_embeddings import event_sequences
-
     root = Path(__file__).resolve().parent
     train, test, fit, predict, columns_by_model, y = load_model_data(root)
     events = pd.read_csv(root / "data/events.csv.gz", parse_dates=["event_ts"])
